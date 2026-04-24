@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="ja" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#F5F5F4">
+<title>通勤時間マネタイザー - 通勤で失う金額を可視化</title>
+<meta name="description" content="片道通勤時間と時給を入れるだけで、年間の無給労働損失を金額換算。週5往復×月21日×年間で計算。">
+<meta property="og:title" content="通勤時間マネタイザー">
+<meta property="og:description" content="通勤で、年間いくら失っているか。">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #F5F5F4; --surface: #FFFFFF; --surface-2: #EFEEEC; --surface-3: #E7E5E4;
+  --border: #D6D3D1; --border-strong: #A8A29E;
+  --text: #0A0A0A; --text-2: #262626; --dim: #57534E; --dim-2: #78716C;
+  --primary: #0A0A0A; --accent: #0A0A0A;
+  --success: #047857; --danger: #B91C1C; --warning: #B45309;
+  --radius-sm: 4px; --radius: 6px; --radius-lg: 10px;
+  --shadow-sm: 0 1px 0 rgba(10,10,10,0.04);
+  --shadow: 0 1px 2px rgba(10,10,10,0.04);
+  --shadow-lg: 0 8px 24px -8px rgba(10,10,10,0.12);
+  --duration: 160ms; --ease: cubic-bezier(0.2, 0, 0, 1);
+  --font-sans: "Inter", "Noto Sans JP", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-num: "JetBrains Mono", "Inter", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --tap: 48px; --safe-top: env(safe-area-inset-top, 0px); --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+[data-theme="dark"] {
+  --bg: #0A0A0A; --surface: #141414; --surface-2: #1A1A1A; --surface-3: #222222;
+  --border: #2A2A2A; --border-strong: #3F3F3F;
+  --text: #FAFAFA; --text-2: #E5E5E5; --dim: #A3A3A3; --dim-2: #737373;
+  --primary: #FAFAFA; --accent: #FAFAFA;
+  --success: #34D399; --danger: #F87171; --warning: #FBBF24;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { -webkit-text-size-adjust: 100%; }
+html, body {
+  background: var(--bg); color: var(--text);
+  font-family: var(--font-sans); font-size: 15px; line-height: 1.55;
+  -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "cv11", "ss01", "ss03";
+  letter-spacing: -0.005em; overscroll-behavior-y: none;
+}
+body { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column;
+  padding-top: var(--safe-top); padding-bottom: var(--safe-bottom); }
+button { font-family: inherit; font-size: inherit; cursor: pointer; background: none; border: none; color: inherit; }
+input, select { font-family: inherit; font-size: inherit; color: inherit; }
+.tnum { font-variant-numeric: tabular-nums; }
+
+.app {
+  flex: 1; display: flex; flex-direction: column;
+  max-width: 540px; width: 100%; margin: 0 auto;
+  padding: clamp(12px, 4vw, 20px) clamp(16px, 5vw, 28px) 48px;
+}
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 4px 0 clamp(24px, 6vw, 40px);
+}
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 600; font-size: 13px; letter-spacing: -0.01em; color: var(--text); }
+.brand-mark {
+  width: 28px; height: 28px; border-radius: var(--radius-sm);
+  background: var(--text); color: var(--bg);
+  display: grid; place-items: center;
+  font-size: 13px; font-weight: 700; font-family: var(--font-num); letter-spacing: -0.02em;
+}
+.brand-meta {
+  font-family: var(--font-mono); font-size: 11px; color: var(--dim);
+  text-transform: uppercase; letter-spacing: 0.06em; margin-left: 2px;
+}
+.icon-btn {
+  width: var(--tap); height: var(--tap); display: grid; place-items: center;
+  border-radius: var(--radius); color: var(--dim);
+  transition: background var(--duration) var(--ease), color var(--duration) var(--ease);
+  -webkit-tap-highlight-color: transparent;
+}
+.icon-btn:hover { background: var(--surface-2); color: var(--text); }
+.icon-btn svg { width: 18px; height: 18px; }
+
+.hero { margin-bottom: clamp(28px, 7vw, 40px); }
+.hero-eyebrow {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.12em; color: var(--dim);
+  margin-bottom: 14px; display: inline-flex; align-items: center; gap: 8px;
+}
+.hero-eyebrow::before { content: ""; width: 18px; height: 1px; background: var(--border-strong); }
+.hero h1 {
+  font-size: clamp(28px, 7.5vw, 36px); font-weight: 800;
+  letter-spacing: -0.035em; line-height: 1.05; margin-bottom: 12px; color: var(--text);
+}
+.hero p { font-size: clamp(14px, 3.8vw, 15px); color: var(--dim); max-width: 42ch; line-height: 1.6; }
+
+.field { margin-bottom: 22px; }
+.field-label {
+  display: flex; align-items: baseline; justify-content: space-between;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 500; color: var(--dim);
+  margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+}
+.field-label .req {
+  font-family: var(--font-sans); font-size: 10px; color: var(--dim-2);
+  text-transform: none; letter-spacing: 0; font-weight: 400;
+}
+.field-hint { font-family: var(--font-mono); font-size: 11px; color: var(--dim-2); margin-top: 10px; }
+
+.preset-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px;
+}
+.preset {
+  min-height: 60px; padding: 10px 14px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  text-align: left; display: flex; flex-direction: column; gap: 2px;
+  transition: border-color var(--duration) var(--ease), background var(--duration) var(--ease);
+  -webkit-tap-highlight-color: transparent;
+}
+.preset:hover { border-color: var(--border-strong); }
+.preset[aria-pressed="true"] { border-color: var(--text); box-shadow: inset 0 0 0 1px var(--text); }
+.preset-title {
+  font-family: var(--font-mono); font-size: 10px; color: var(--dim);
+  font-weight: 500; text-transform: uppercase; letter-spacing: 0.08em;
+}
+.preset-val {
+  font-family: var(--font-num); font-size: 15px; font-weight: 700; color: var(--text);
+  font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+}
+
+.input-wrap {
+  position: relative;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  transition: border-color var(--duration) var(--ease);
+}
+.input-wrap:focus-within { border-color: var(--text); }
+.input-wrap input {
+  width: 100%; height: var(--tap); padding: 0 14px 0 32px;
+  border: none; background: transparent; outline: none;
+  font-size: 16px; font-weight: 600;
+  font-family: var(--font-num); font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
+}
+.input-wrap .suffix {
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+  color: var(--dim); font-family: var(--font-mono); font-size: 12px; pointer-events: none;
+}
+.input-wrap.no-prefix input { padding-left: 14px; }
+.input-wrap .prefix {
+  position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+  color: var(--dim); font-family: var(--font-num); font-weight: 500; pointer-events: none;
+}
+
+.big-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: clamp(32px, 8vw, 44px) clamp(20px, 6vw, 32px);
+  text-align: center; margin-bottom: 16px;
+  position: relative; overflow: hidden;
+}
+.big-card::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--danger), transparent); opacity: 0.4;
+}
+.big-label {
+  font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.14em; color: var(--danger);
+  margin-bottom: 14px;
+}
+.big-amount {
+  font-family: var(--font-num); font-size: clamp(36px, 11vw, 52px);
+  font-weight: 700; letter-spacing: -0.04em; line-height: 1;
+  font-variant-numeric: tabular-nums; margin-bottom: 10px; color: var(--text);
+}
+.big-amount .yen {
+  font-size: 0.5em; color: var(--dim); font-weight: 500;
+  margin-right: 0.12em; vertical-align: 0.25em; letter-spacing: 0;
+}
+.big-sub {
+  font-family: var(--font-mono); font-size: 11px; color: var(--dim);
+  letter-spacing: 0.08em; text-transform: uppercase;
+}
+
+.break-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 16px;
+}
+.stat {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 12px 10px; text-align: left;
+}
+.stat-label {
+  font-family: var(--font-mono); font-size: 9px; color: var(--dim);
+  margin-bottom: 6px; font-weight: 500;
+  text-transform: uppercase; letter-spacing: 0.08em;
+}
+.stat-val {
+  font-family: var(--font-num); font-size: 14px; font-weight: 700;
+  font-variant-numeric: tabular-nums; letter-spacing: -0.02em; color: var(--text);
+}
+.stat-val .yen-s {
+  font-size: 10px; color: var(--dim); margin-right: 1px;
+  font-family: var(--font-mono); font-weight: 400;
+}
+.stat-val .unit {
+  font-size: 10px; color: var(--dim); margin-left: 2px; font-weight: 500;
+}
+
+.comparison {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px; margin-bottom: 16px;
+}
+.comp-head {
+  font-family: var(--font-mono); font-size: 10px; color: var(--dim);
+  text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 10px; font-weight: 500;
+}
+.comp-item {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 6px 0; border-bottom: 1px dashed var(--border);
+}
+.comp-item:last-child { border-bottom: none; }
+.comp-name { font-size: 13px; color: var(--text-2); }
+.comp-val {
+  font-family: var(--font-num); font-size: 14px; font-weight: 700;
+  color: var(--text); font-variant-numeric: tabular-nums; letter-spacing: -0.02em;
+}
+
+.btn {
+  width: 100%; min-height: 52px; padding: 0 20px;
+  border-radius: var(--radius); font-size: 15px; font-weight: 600;
+  letter-spacing: -0.01em;
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  transition: background var(--duration) var(--ease), border-color var(--duration) var(--ease), color var(--duration) var(--ease), transform 80ms var(--ease);
+  user-select: none; -webkit-tap-highlight-color: transparent;
+  font-family: var(--font-sans);
+}
+.btn:active { transform: scale(0.985); }
+.btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--surface-2); border-color: var(--border-strong); }
+.btn-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+.footer {
+  margin-top: auto; padding-top: 40px;
+  font-family: var(--font-mono); font-size: 10px; color: var(--dim-2);
+  text-align: center; text-transform: uppercase; letter-spacing: 0.1em;
+}
+.footer a { color: var(--dim); text-decoration: none; }
+.footer a:hover { color: var(--text); }
+
+.toast {
+  position: fixed; bottom: calc(20px + var(--safe-bottom)); left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--text); color: var(--bg);
+  padding: 12px 18px; border-radius: var(--radius);
+  font-size: 13px; font-weight: 500; box-shadow: var(--shadow-lg);
+  opacity: 0; transition: opacity 220ms var(--ease), transform 220ms var(--ease);
+  z-index: 100; pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+@media (max-width: 768px) { .app { max-width: 100%; } }
+@media (max-width: 480px) {
+  :root { --tap: 52px; }
+  body { font-size: 14px; }
+  .app { padding: 12px 16px 40px; }
+  .topbar { padding: 2px 0 22px; }
+  .hero h1 { font-size: clamp(24px, 8vw, 30px); }
+  .big-card { padding: 28px 16px; }
+  .big-amount { font-size: clamp(32px, 10vw, 42px); }
+  .break-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
+  .btn { min-height: 54px; font-size: 14.5px; padding: 0 16px; }
+  .footer { padding-top: 32px; font-size: 9px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.01ms !important; }
+}
+@media (hover: none) {
+  .btn-secondary:hover { background: var(--surface); border-color: var(--border); }
+  .preset:hover { border-color: var(--border); }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">🚆</div>
+      <span>Commute $</span>
+      <span class="brand-meta">v1.0</span>
+    </div>
+    <button class="icon-btn" id="themeToggle" aria-label="テーマ切替">
+      <svg id="iconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+      <svg id="iconMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" hidden><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+  </header>
+
+  <div class="hero">
+    <div class="hero-eyebrow">Lost Value · Client-side</div>
+    <h1>通勤時間、<br>年間いくら失ってる？</h1>
+    <p>片道の通勤時間と時給を入れると、1日・月・年・10年の無給労働損失を金額換算。計算根拠：週5日×月21日×年252日（祝日除く概算）。</p>
+  </div>
+
+  <div class="field">
+    <label class="field-label">
+      <span>片道通勤時間</span>
+      <span class="req">必須</span>
+    </label>
+    <div class="preset-grid">
+      <button type="button" class="preset min-preset" data-min="15">
+        <span class="preset-title">近め</span>
+        <span class="preset-val">15分</span>
+      </button>
+      <button type="button" class="preset min-preset" data-min="30">
+        <span class="preset-title">平均的</span>
+        <span class="preset-val">30分</span>
+      </button>
+      <button type="button" class="preset min-preset" data-min="45" aria-pressed="true">
+        <span class="preset-title">東京平均</span>
+        <span class="preset-val">45分</span>
+      </button>
+      <button type="button" class="preset min-preset" data-min="75">
+        <span class="preset-title">郊外から</span>
+        <span class="preset-val">75分</span>
+      </button>
+    </div>
+    <div class="input-wrap">
+      <input type="number" id="minInput" value="45" min="1" max="480" inputmode="numeric" aria-label="カスタム片道通勤時間" style="padding-left:14px;">
+      <span class="suffix">分 (片道)</span>
+    </div>
+  </div>
+
+  <div class="field">
+    <label class="field-label">
+      <span>あなたの時給</span>
+      <span class="req">必須</span>
+    </label>
+    <div class="preset-grid">
+      <button type="button" class="preset wage-preset" data-wage="1100">
+        <span class="preset-title">アルバイト</span>
+        <span class="preset-val">¥1,100</span>
+      </button>
+      <button type="button" class="preset wage-preset" data-wage="1500" aria-pressed="true">
+        <span class="preset-title">新卒</span>
+        <span class="preset-val">¥1,500</span>
+      </button>
+      <button type="button" class="preset wage-preset" data-wage="2500">
+        <span class="preset-title">一般</span>
+        <span class="preset-val">¥2,500</span>
+      </button>
+      <button type="button" class="preset wage-preset" data-wage="5000">
+        <span class="preset-title">管理職</span>
+        <span class="preset-val">¥5,000</span>
+      </button>
+    </div>
+    <div class="input-wrap">
+      <span class="prefix">¥</span>
+      <input type="number" id="wageInput" value="1500" min="0" max="999999" inputmode="numeric" aria-label="カスタム時給">
+    </div>
+    <p class="field-hint">月給 ÷ 160 ≒ 時給（フルタイム想定）</p>
+  </div>
+
+  <div class="big-card">
+    <div class="big-label">年間損失</div>
+    <div class="big-amount tnum"><span class="yen">¥</span><span id="yearVal">0</span></div>
+    <div class="big-sub" id="yearSub">年間 0時間 / 0日分</div>
+  </div>
+
+  <div class="break-grid">
+    <div class="stat">
+      <div class="stat-label">1日</div>
+      <div class="stat-val tnum"><span class="yen-s">¥</span><span id="dayVal">0</span></div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">1週</div>
+      <div class="stat-val tnum"><span class="yen-s">¥</span><span id="weekVal">0</span></div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">1月</div>
+      <div class="stat-val tnum"><span class="yen-s">¥</span><span id="monthVal">0</span></div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">10年</div>
+      <div class="stat-val tnum"><span class="yen-s">¥</span><span id="decadeVal">0</span></div>
+    </div>
+  </div>
+
+  <div class="comparison">
+    <div class="comp-head">年間損失で買えるもの</div>
+    <div id="compBody"></div>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-secondary" id="shareBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+      Xでシェア
+    </button>
+    <button class="btn btn-secondary" id="copyBtn">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+      コピー
+    </button>
+  </div>
+
+  <footer class="footer">
+    <a href="https://x.com/otsu_dev" target="_blank" rel="noopener">100 Web Apps Challenge · #18</a>
+  </footer>
+</div>
+
+<div class="toast" id="toast">コピーしました</div>
+
+<script>
+(() => {
+  'use strict';
+
+  const WORK_DAYS_PER_YEAR = 252;
+  const WORK_DAYS_PER_MONTH = 21;
+
+  const state = { min: 45, wage: 1500 };
+
+  const $ = (id) => document.getElementById(id);
+  const minInput = $('minInput');
+  const wageInput = $('wageInput');
+  const minPresets = document.querySelectorAll('.min-preset');
+  const wagePresets = document.querySelectorAll('.wage-preset');
+  const dayVal = $('dayVal');
+  const weekVal = $('weekVal');
+  const monthVal = $('monthVal');
+  const yearVal = $('yearVal');
+  const yearSub = $('yearSub');
+  const decadeVal = $('decadeVal');
+  const compBody = $('compBody');
+  const toast = $('toast');
+
+  const fmt = (n) => Math.floor(n).toLocaleString('ja-JP');
+  const showToast = (msg) => {
+    toast.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => toast.classList.remove('show'), 1800);
+  };
+
+  // ===== Theme =====
+  const themeToggle = $('themeToggle');
+  const applyTheme = (t) => {
+    document.documentElement.setAttribute('data-theme', t);
+    $('iconSun').hidden = t === 'dark';
+    $('iconMoon').hidden = t !== 'dark';
+    document.querySelector('meta[name="theme-color"]').setAttribute('content', t === 'dark' ? '#0A0A0A' : '#F5F5F4');
+  };
+  const savedTheme = localStorage.getItem('cm-theme') ||
+    (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  applyTheme(savedTheme);
+  themeToggle.addEventListener('click', () => {
+    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    localStorage.setItem('cm-theme', next);
+    applyTheme(next);
+  });
+
+  // ===== Inputs =====
+  minPresets.forEach(btn => {
+    btn.addEventListener('click', () => {
+      minPresets.forEach(b => b.setAttribute('aria-pressed', 'false'));
+      btn.setAttribute('aria-pressed', 'true');
+      minInput.value = btn.dataset.min;
+      update();
+    });
+  });
+  minInput.addEventListener('input', () => {
+    minPresets.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.min) === String(minInput.value) ? 'true' : 'false'));
+    update();
+  });
+  wagePresets.forEach(btn => {
+    btn.addEventListener('click', () => {
+      wagePresets.forEach(b => b.setAttribute('aria-pressed', 'false'));
+      btn.setAttribute('aria-pressed', 'true');
+      wageInput.value = btn.dataset.wage;
+      update();
+    });
+  });
+  wageInput.addEventListener('input', () => {
+    wagePresets.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.wage) === String(wageInput.value) ? 'true' : 'false'));
+    update();
+  });
+
+  // ===== Restore =====
+  const saved = (() => { try { return JSON.parse(localStorage.getItem('cm-settings') || '{}'); } catch { return {}; } })();
+  if (saved.min) {
+    minInput.value = saved.min;
+    minPresets.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.min) === String(saved.min) ? 'true' : 'false'));
+  }
+  if (saved.wage) {
+    wageInput.value = saved.wage;
+    wagePresets.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.wage) === String(saved.wage) ? 'true' : 'false'));
+  }
+
+  // ===== Calc =====
+  function update() {
+    state.min = Math.max(0, Number(minInput.value) || 0);
+    state.wage = Math.max(0, Number(wageInput.value) || 0);
+    try {
+      localStorage.setItem('cm-settings', JSON.stringify({ min: state.min, wage: state.wage }));
+    } catch {}
+
+    const roundtripMin = state.min * 2;
+    const perDay = state.wage * (roundtripMin / 60);
+    const perWeek = perDay * 5;
+    const perMonth = perDay * WORK_DAYS_PER_MONTH;
+    const perYear = perDay * WORK_DAYS_PER_YEAR;
+    const perDecade = perYear * 10;
+
+    dayVal.textContent = fmt(perDay);
+    weekVal.textContent = fmt(perWeek);
+    monthVal.textContent = fmt(perMonth);
+    yearVal.textContent = fmt(perYear);
+    decadeVal.textContent = fmt(perDecade);
+
+    const yearHours = (roundtripMin / 60) * WORK_DAYS_PER_YEAR;
+    const yearDays = yearHours / 24;
+    yearSub.textContent = `年間 ${yearHours.toFixed(0)}時間 / ${yearDays.toFixed(1)}日分を無給労働`;
+
+    renderComparison(perYear);
+  }
+
+  function renderComparison(yearly) {
+    // 年間損失で買えるもの（おおよその価格）
+    const items = [
+      { name: 'MacBook Pro 14', price: 300000, emoji: '' },
+      { name: 'iPhone 16 Pro', price: 170000 },
+      { name: '国内旅行（1人, 3泊）', price: 80000 },
+      { name: '沖縄旅行（2名, 4泊）', price: 260000 },
+      { name: 'ハワイ旅行（1名, 5泊）', price: 350000 },
+    ];
+    const rows = items.map(it => {
+      const count = yearly / it.price;
+      const display = count >= 1 ? `${count.toFixed(1)}台・回` : `${(count * 100).toFixed(0)}% 分`;
+      return `<div class="comp-item">
+        <span class="comp-name">${it.name}</span>
+        <span class="comp-val">${display}</span>
+      </div>`;
+    }).join('');
+    compBody.innerHTML = rows;
+  }
+
+  update();
+
+  // ===== Share =====
+  const buildShareText = () => {
+    const roundtripMin = state.min * 2;
+    const perYear = state.wage * (roundtripMin / 60) * WORK_DAYS_PER_YEAR;
+    const perDecade = perYear * 10;
+    return `通勤片道 ${state.min}分 × 時給¥${fmt(state.wage)} で、年間¥${fmt(perYear)}・10年で¥${fmt(perDecade)}の無給労働。\n\n#通勤時間マネタイザー`;
+  };
+  $('shareBtn').addEventListener('click', () => {
+    const text = buildShareText();
+    const url = location.origin;
+    window.open(`https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`, '_blank', 'noopener');
+  });
+  $('copyBtn').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(buildShareText() + '\n' + location.origin);
+      showToast('コピーしました');
+    } catch { showToast('コピー失敗'); }
+  });
+})();
+</script>
+</body>
+</html>
